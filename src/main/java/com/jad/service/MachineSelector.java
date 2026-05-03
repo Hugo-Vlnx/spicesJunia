@@ -4,54 +4,67 @@ import com.jad.entity.MachineTool;
 import com.jad.entity.OperationType;
 
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
-
+import java.util.Map;
 
 public class MachineSelector {
 
-    // calcule le temps total pour utiliser une machine en secondes : tps_installation + tps_opé + tps_clean
+    //Dico pour mémoriser quand chaque machine a fini son travail
+    private static Map<Integer, Long> machineAvailability = new HashMap<>();
+
     private static long getTotalTime(MachineTool machine, OperationType operation, float quantity) {
         long installTime = timeToSeconds(machine.getInstallationDuration());
         long cleaningTime = timeToSeconds(machine.getCleaningDuration());
-
-        // durée de l'opération = (durée de l'opération) * (qté / capa max)
         long operationTime = timeToSeconds(operation.getDuration());
-        long scaledOperationTime = (long) (operationTime * (quantity / machine.getMaxQuantity()));
 
-        return installTime + scaledOperationTime + cleaningTime;
+        // utilisation  Math.ceil pour arrondir au lot sup
+        int numberOfBatches = (int) Math.ceil(quantity / machine.getMaxQuantity());
+
+        // Le temps total inclut l'installation, le nettoyage et le temps d'opération pour chaque lot
+        return (installTime + operationTime + cleaningTime) * numberOfBatches;
     }
 
-    // conversion localTime en secondes car le format était en hh:mm:ss et c'était plus simple pour les comparaisons
     private static long timeToSeconds(LocalTime time) {
         return time.toSecondOfDay();
     }
 
-    // singe pour trouver la machine la plus rapide
-    public static MachineTool selectBestMachine(List<MachineTool> machines,
-                                                OperationType operation,
-                                                float quantity) {
-        // Vérif
+    // singe pour trouver la machine la plus rapide globalement
+    public static MachineTool selectBestMachine(List<MachineTool> machines, OperationType operation, float quantity) {
         if (machines == null || machines.isEmpty() || operation == null) {
             return null;
         }
 
         MachineTool bestMachine = null;
-        long minTime = Long.MAX_VALUE;
+        long earliestFinishTime = Long.MAX_VALUE;
 
-        // Parcours toutes les machines
         for (MachineTool machine : machines) {
+            //calcul du temps que prendra cette tâche spécifique
+            long taskDuration = getTotalTime(machine, operation, quantity);
 
-            // Calcule le temps pour cette machine
-            long totalTime = getTotalTime(machine, operation, quantity);
+            // récupére du temps déjà occupé par la machine
+            long availableFrom = machineAvailability.getOrDefault(machine.getId(), 0L);
 
-            // Si c'est la meilleure jusqu'à présent on la garde
-            if (totalTime < minTime) {
-                minTime = totalTime;
+            //heure de fin réelle = heure à laquelle elle est libre + durée de la tâche
+            long finishTime = availableFrom + taskDuration;
+
+            //  cherche la machine qui terminera le plus tôt au global
+            if (finishTime < earliestFinishTime) {
+                earliestFinishTime = finishTime;
                 bestMachine = machine;
             }
+        }
+
+        // MAJ  le calendrier de la machine
+        if (bestMachine != null) {
+            machineAvailability.put(bestMachine.getId(), earliestFinishTime);
         }
 
         return bestMachine;
     }
 
+    // méthode  pour remettre les compteurs à zéro
+    public static void resetAvailability() {
+        machineAvailability.clear();
+    }
 }

@@ -35,7 +35,7 @@ public class ProductionPlanService {
         if (op != null
                 && op.getLossOfQuantity() != null
                 && op.getLossOfQuantity() > 0) {
-            // Guard : évite une division par zéro si lossOfQuantity vaut 100
+            // on évite une division par zéro si lossOfQuantity vaut 100
             if (op.getLossOfQuantity() >= 100) {
                 throw new IllegalStateException(
                         "Perte de 100% ou plus sur l'opération \"" + op.getLabel() + "\" — impossible de produire.");
@@ -51,7 +51,7 @@ public class ProductionPlanService {
             ingredients.add(new ProductionStep.Ingredient(enfant.getProduct(), quantiteComposant));
         }
 
-        // sélectionne la meilleure machine si opération existe
+        // sélectionne la meilleure machine si opé existe
         MachineTool machine = null;
         if (op != null && operationTypeService != null) {
             try {
@@ -63,7 +63,7 @@ public class ProductionPlanService {
         }
 
 
-        // Ajout de l'étape après ses enfants
+        // ajout de l'étape après ses enfants
         steps.add(new ProductionStep(node.getProduct(), op, machine, quantiteAProduire, ingredients));
     }
 }

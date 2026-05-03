@@ -10,38 +10,48 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
 public class ScheduleGenerator {
 
     public static String generateScheduleJson(List<ProductionStep> steps) {
-        // Groupe les étapes par machine
+        // groupe les étapes par machine
         Map<Integer, MachineScheduleDTO> scheduleByMachine = new HashMap<>();
 
-        int orderNumber = 0;
         for (ProductionStep step : steps) {
-            // Saute les matières premières
-            if (step.isRawMaterial()) {
+            // saute les matières premières
+            if (step.isRawMaterial() || step.machine() == null) {
                 continue;
             }
 
-            // Récupère l'ID de la machine
-            int machineId = step.machine() != null ? step.machine().getId() : -1;
+            int machineId = step.machine().getId();
 
-            // Crée l'ordre
-            OrderDTO order = new OrderDTO(
-                    orderNumber,
-                    step.product().getId(),
-                    step.quantityNeeded()
-            );
-
-            // Ajoute à la machine correspondante
+            // ajoute la machine au dico si elle n'y est pas encore
             scheduleByMachine.putIfAbsent(machineId, new MachineScheduleDTO(machineId));
-            scheduleByMachine.get(machineId).orders.add(order);
 
-            orderNumber++;
+            //  var pour le découpage en lots
+            float remainingQuantity = step.quantityNeeded();
+            float maxCapacity = step.machine().getMaxQuantity();
+
+
+            while (remainingQuantity > 0) {
+                // on prend soit le reste exact soit la capa max de la machine
+                float orderQuantity = Math.min(remainingQuantity, maxCapacity);
+
+                // on crée l'ordre pour ce lot spécifique
+                OrderDTO order = new OrderDTO(
+                        0,
+                        step.product().getId(),
+                        orderQuantity
+                );
+
+                // on l'ajoute à la liste d'ordre de cette machine
+                scheduleByMachine.get(machineId).orders.add(order);
+
+                // on deduit la quantite qu'on vient de mettre dans cet ordre
+                remainingQuantity -= orderQuantity;
+            }
         }
 
-        // Numéroter les ordres dans chaque machine à partir de 0
+        // numéroter les ordres dans chaque machine chronologiquement
         for (MachineScheduleDTO schedule : scheduleByMachine.values()) {
             for (int i = 0; i < schedule.orders.size(); i++) {
                 schedule.orders.get(i).numOrder = i;
@@ -53,5 +63,4 @@ public class ScheduleGenerator {
         List<MachineScheduleDTO> schedules = new ArrayList<>(scheduleByMachine.values());
         return gson.toJson(schedules);
     }
-
 }
